@@ -10,6 +10,7 @@ GRID_SIZE = 20
 CELL_SIZE = 40
 SCREEN_SIZE = GRID_SIZE * CELL_SIZE
 FPS = 50
+q_table = {}  # Maps state-action pairs to Q-values
 
 # Colors
 BACKGROUND_COLOR = (30, 30, 30)  # Dark gray
@@ -86,8 +87,8 @@ def check_collisions():
         return True
 
     # # Check self collision
-    # if snake[0] in snake[1:]:
-    #     return True
+    if snake[0] in snake[1:]:
+        return True
 
     # Check green apple collision
     for apple in green_apples:
@@ -125,6 +126,28 @@ def ai_decide_direction():
 
     # Default to the current direction if no better option is found
     return snake_dir
+
+
+# Function to get the current state of the game
+def get_state():
+    global snake, green_apples, red_apple, GRID_SIZE
+
+    head_x, head_y = snake[0]
+
+    # Check for apples in each direction
+    apple_up = 1 if (head_x, head_y - 1) in green_apples or (head_x, head_y - 1) == red_apple else 0
+    apple_down = 1 if (head_x, head_y + 1) in green_apples or (head_x, head_y + 1) == red_apple else 0
+    apple_left = 1 if (head_x - 1, head_y) in green_apples or (head_x - 1, head_y) == red_apple else 0
+    apple_right = 1 if (head_x + 1, head_y) in green_apples or (head_x + 1, head_y) == red_apple else 0
+
+    # Check for obstacles in each direction
+    obst_up = 1 if head_y - 1 < 0 or (head_x, head_y - 1) in snake else 0
+    obst_down = 1 if head_y + 1 >= GRID_SIZE or (head_x, head_y + 1) in snake else 0
+    obst_left = 1 if head_x - 1 < 0 or (head_x - 1, head_y) in snake else 0
+    obst_right = 1 if head_x + 1 >= GRID_SIZE or (head_x + 1, head_y) in snake else 0
+
+    # Return the state as a tuple
+    return (apple_up, apple_down, apple_left, apple_right, obst_up, obst_down, obst_left, obst_right)
 
 
 # Main game loop
