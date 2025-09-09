@@ -1,0 +1,1 @@
+q_table = {}  # Initialize an empty Q-table
