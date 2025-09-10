@@ -4,7 +4,6 @@ import random
 import sys
 import pickle
 import matplotlib.pyplot as plt
-from q_table_storage import q_table
 import os
 
 # Initialize pygame
@@ -189,23 +188,23 @@ def load_q_table(filename="q_table.pkl"):
     global q_table
     try:
         with open(filename, "rb") as f:
-            q_table = pickle.load(f)
-        print(f"Q-table loaded from {filename}. Number of entries: {len(q_table)}")
+            loaded_q_table = pickle.load(f)
+        print(f"Q-table loaded from {filename}. Number of entries: {len(loaded_q_table)}")
+
+        # Merge the loaded Q-table with the existing one
+        q_table.update(loaded_q_table)
+
+        print(f"Q-table updated. Total number of entries: {len(q_table)}")
         if len(q_table) > 0:
             print("Sample Q-table entries:")
-            # for key, value in list(q_table.items())[-5:]:  # Print the last 5 entries
-                # print(f"State-Action: {key}, Q-value: {value}")
+            for key, value in list(q_table.items())[-5:]:  # Print the last 5 entries
+                print(f"State-Action: {key}, Q-value: {value}")
     except FileNotFoundError:
         print(f"No Q-table found at {filename}. Starting with an empty Q-table.")
-        q_table = {}
 
 
-# Main game loop
-def play():
+def play(q_table):
     global snake, snake_dir, snake_length, green_apples, red_apple, screen
-
-    # Load the Q-table before starting the game
-    load_q_table()
 
     # Initialize the screen for playing
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
@@ -222,16 +221,11 @@ def play():
         draw_right_section()
         pygame.display.flip()
 
-        # Handle events (e.g., quitting the game)
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                running = False
-
         # Get the current state
         state = get_state(snake, green_apples, red_apple, GRID_SIZE)
 
         # Choose the best action based on the Q-table (exploit only)
-        action = choose_action(state, 0, snake_dir)  # epsilon=0 ensures no random moves
+        action = choose_action(state, 0, snake_dir, q_table)  # epsilon=0 ensures no random moves
         snake_dir = action_to_direction(action, snake_dir)
 
         # Move the snake
@@ -249,7 +243,7 @@ def play():
     sys.exit()
 
 
-def train(num_episodes, epsilon, alpha, gamma):
+def train(num_episodes, epsilon, alpha, gamma, q_table):
     global snake, snake_dir, snake_length, green_apples, red_apple, screen
 
     rewards_per_episode = []  # List to store rewards for each episode
@@ -263,13 +257,16 @@ def train(num_episodes, epsilon, alpha, gamma):
         snake_length = 3
         green_apples = [(random.randint(0, GRID_SIZE - 1), random.randint(0, GRID_SIZE - 1)) for _ in range(2)]
         red_apple = (random.randint(0, GRID_SIZE - 1), random.randint(0, GRID_SIZE - 1))
-        epsilon = max(0.01, epsilon * 0.995)  # Decay epsilon but keep it above 0.01
+
+        # if (episode + 1) % 50000 == 0:
+        #     epsilon = 0.1
+        #     print(f"Resetting epsilon to {epsilon} at episode {episode + 1}")
+        epsilon = max(0.01, epsilon * 0.99995)  # Decay epsilon but keep it above 0.01
 
         # Track cumulative reward for this episode
         cumulative_reward = 0
 
-        # Check if this episode should be rendered
-        render = (episode + 1) % 10000 == 0
+        render = (episode + 1) % 10000 == 0  # Render every 1000 episodes
 
         if render:
             # Initialize the screen for rendering
@@ -286,20 +283,20 @@ def train(num_episodes, epsilon, alpha, gamma):
                 pygame.display.flip()
 
             state = get_state(snake, green_apples, red_apple, GRID_SIZE)
-            action = choose_action(state, epsilon, snake_dir)
+            action = choose_action(state, epsilon, snake_dir, q_table)
             snake_dir = action_to_direction(action, snake_dir)
             move_snake()
             reward = calculate_reward(snake, green_apples, red_apple, GRID_SIZE)
             cumulative_reward += reward  # Add reward to cumulative reward
             next_state = get_state(snake, green_apples, red_apple, GRID_SIZE)
-            update_q_value(state, action, reward, next_state, alpha, gamma)
+            update_q_value(state, action, reward, next_state, alpha, gamma, q_table)
 
             if check_collisions():
                 break  # End the episode if the snake collides
 
             if render:
                 clock.tick(30)  # Limit the frame rate to 30 FPS for rendering
-
+                    
         # Store the cumulative reward and snake length for this episode
         rewards_per_episode.append(cumulative_reward)
         length_per_episode.append(snake_length)
@@ -320,9 +317,8 @@ def train(num_episodes, epsilon, alpha, gamma):
             pygame.display.init()
 
     print("Training completed!")
-
-    # Generate graphs
     plot_training_statistics(length_per_episode, max_length)
+
 
 def plot_training_statistics(length_per_episode, max_length):
     # Calculate moving average of snake length over 1000 episodes
@@ -357,33 +353,16 @@ def plot_training_statistics(length_per_episode, max_length):
     plt.legend()
     plt.tight_layout()
 
-    # Save the graph as an image
-    filename = "training_statistics.png"
+    # Save the graph as an image to the folder training_stats
+    folder = "training_statistics"
+    os.makedirs(folder, exist_ok=True)
+    filename = os.path.join(folder, "training_statistics.png")
     if os.path.exists(filename):
-        base, ext = os.path.splitext(filename)
+        base, ext = os.path.splitext("training_statistics.png")
         counter = 1
-        while os.path.exists(f"{base}_{counter}{ext}"):
+        while os.path.exists(os.path.join(folder, f"{base}_{counter}{ext}")):
             counter += 1
-        filename = f"{base}_{counter}{ext}"
+        filename = os.path.join(folder, f"{base}_{counter}{ext}")
 
     plt.savefig(filename)
     plt.show()
-
-if __name__ == "__main__":
-    mode = input("Enter 'train' to train the AI or 'play' to watch the AI play: ").strip().lower()
-
-    if mode == "train":
-        num_episodes = int(input("Enter the number of training episodes: "))
-        epsilon = 0.1  # Initial exploration rate for training
-        alpha = 0.1    # Learning rate
-        gamma = 0.9    # Discount factor
-        train(num_episodes, epsilon, alpha, gamma)
-        save_q_table()
-    elif mode == "play":
-        # Initialize screen
-        screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-        pygame.display.set_caption("Snake Game")
-        load_q_table()  # Load the pre-trained Q-table
-        play()  # Play the game without retraining
-    else:
-        print("Invalid mode. Exiting.")

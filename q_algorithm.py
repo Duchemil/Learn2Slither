@@ -1,13 +1,7 @@
 import random
 from collections import Counter
-from q_table_storage import q_table
-import pickle
 
-with open("q_table.pkl", "rb") as f:
-    q_table = pickle.load(f)
-
-def choose_action(state, epsilon, current_dir):
-    # Define the possible directions
+def choose_action(state, epsilon, current_dir, q_table):
     directions = {
         0: (0, -1),  # Up
         1: (0, 1),   # Down
@@ -15,35 +9,23 @@ def choose_action(state, epsilon, current_dir):
         3: (1, 0)    # Right
     }
 
-    # Filter out actions that would reverse the snake
     valid_actions = [
         action for action, direction in directions.items()
         if not (direction[0] == -current_dir[0] and direction[1] == -current_dir[1])
     ]
-    # print(f"Number of entries in Q-table: {len(q_table)}")
-    # print("Sample entries:", list(q_table.items())[-5:])
 
-    # Print whole q_table for debugging
-    # print("Current Q-table:")
-    # for key in sorted(q_table.keys()):
-    #     print(f"State: {key[0]}, Action: {key[1]}, Q-value: {q_table[key]}")
     if random.uniform(0, 1) < epsilon:
-        # Explore: choose a random valid action with uniform probability
-        chosen_action = random.choices(valid_actions, k=1)[0]
-        # print(f"Exploring: Chose action {chosen_action}")
-        return chosen_action
+        return random.choice(valid_actions)
     else:
-        # Exploit: choose the best valid action based on the Q-table
-        chosen_action = max(valid_actions, key=lambda a: q_table.get((state, a), 0), default=random.choice(valid_actions))
-        # print(f"Exploiting: State: {state}, Chose action {chosen_action}, Q-value: {q_table.get((state, chosen_action), 0)}")
-        return chosen_action
+        return max(valid_actions, key=lambda a: q_table.get((state, a), 0), default=random.choice(valid_actions))
 
 
-def update_q_value(state, action, reward, next_state, alpha, gamma):
-    # max_next_q = max([q_table.get((state, a), 0) for a in range(4)], default=0)
+def update_q_value(state, action, reward, next_state, alpha, gamma, q_table):
     max_next_q = max([q_table.get((next_state, a), 0) for a in range(4)], default=0)
     current_q = q_table.get((state, action), 0)
-    q_table[(state, action)] = current_q + alpha * (reward + gamma * max_next_q - current_q)
+    new_q = current_q + alpha * (reward + gamma * max_next_q - current_q)
+    q_table[(state, action)] = new_q
+    # print(f"Updated Q-value for state-action ({state}, {action}): {new_q}")
 
  
 def get_state(snake, green_apples, red_apple, GRID_SIZE):
