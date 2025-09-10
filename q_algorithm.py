@@ -1,6 +1,10 @@
 import random
 from collections import Counter
-from q_table_storage import q_table 
+from q_table_storage import q_table
+import pickle
+
+with open("q_table.pkl", "rb") as f:
+    q_table = pickle.load(f)
 
 def choose_action(state, epsilon, current_dir):
     # Define the possible directions
@@ -16,9 +20,13 @@ def choose_action(state, epsilon, current_dir):
         action for action, direction in directions.items()
         if not (direction[0] == -current_dir[0] and direction[1] == -current_dir[1])
     ]
+    # print(f"Number of entries in Q-table: {len(q_table)}")
+    # print("Sample entries:", list(q_table.items())[-5:])
 
-    # print(f"Valid actions: {valid_actions}")
-
+    # Print whole q_table for debugging
+    # print("Current Q-table:")
+    # for key in sorted(q_table.keys()):
+    #     print(f"State: {key[0]}, Action: {key[1]}, Q-value: {q_table[key]}")
     if random.uniform(0, 1) < epsilon:
         # Explore: choose a random valid action with uniform probability
         chosen_action = random.choices(valid_actions, k=1)[0]
@@ -32,7 +40,8 @@ def choose_action(state, epsilon, current_dir):
 
 
 def update_q_value(state, action, reward, next_state, alpha, gamma):
-    max_next_q = max([q_table.get((state, a), 0) for a in range(4)], default=0)
+    # max_next_q = max([q_table.get((state, a), 0) for a in range(4)], default=0)
+    max_next_q = max([q_table.get((next_state, a), 0) for a in range(4)], default=0)
     current_q = q_table.get((state, action), 0)
     q_table[(state, action)] = current_q + alpha * (reward + gamma * max_next_q - current_q)
 
@@ -42,7 +51,7 @@ def get_state(snake, green_apples, red_apple, GRID_SIZE):
 
     # Normalize distances to the grid size
     def normalize(value):
-        return value / GRID_SIZE
+        return round(value / GRID_SIZE, 2)
 
     # Calculate distances to objects in a given direction
     def calculate_distance(dx, dy):
@@ -98,7 +107,7 @@ def calculate_reward(snake, green_apples, red_apple, GRID_SIZE):
     # Reward for eating green apple
     if head in green_apples:
         return 10
-
+    
     # Penalty for eating red apple
     if head == red_apple:
         return -10
@@ -121,10 +130,10 @@ def calculate_reward(snake, green_apples, red_apple, GRID_SIZE):
         return 1  # Small reward for moving closer
 
     # Penalty for moving closer to a red apple
-    prev_distance_to_red = abs(red_apple[0] - prev_head[0]) + abs(red_apple[1] - prev_head[1])
-    new_distance_to_red = abs(red_apple[0] - head[0]) + abs(red_apple[1] - head[1])
-    if new_distance_to_red < prev_distance_to_red:
-        return -1  # Small penalty for moving closer to a red apple
+    # prev_distance_to_red = abs(red_apple[0] - prev_head[0]) + abs(red_apple[1] - prev_head[1])
+    # new_distance_to_red = abs(red_apple[0] - head[0]) + abs(red_apple[1] - head[1])
+    # if new_distance_to_red < prev_distance_to_red:
+    #     return -1  # Small penalty for moving closer to a red apple
 
     # Small penalty for each move to encourage shorter paths
     return -1

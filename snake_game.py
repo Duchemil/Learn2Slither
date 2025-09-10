@@ -29,7 +29,7 @@ BACKGROUND_COLOR = (30, 30, 30)  # Dark gray
 GRID_COLOR = (50, 50, 50)  # Slightly lighter gray
 SNAKE_COLOR = (0, 200, 0)  # Bright green
 SNAKE_EYE_COLOR = (255, 255, 255)  # White for eyes
-APPLE_GREEN_COLOR = (0, 255, 0)  # Bright green
+APPLE_GREEN_COLOR = (170, 255, 170)  # Bright green
 APPLE_RED_COLOR = (255, 0, 0)  # Bright red
 
 
@@ -109,6 +109,7 @@ def move_snake():
     global snake, snake_length
     new_head = (snake[0][0] + snake_dir[0], snake[0][1] + snake_dir[1])
     snake = [new_head] + snake[:snake_length - 1]
+    # print(f"Snake moved to {new_head} in direction {snake_dir}")
 
 
 # Function to check collisions
@@ -192,8 +193,8 @@ def load_q_table(filename="q_table.pkl"):
         print(f"Q-table loaded from {filename}. Number of entries: {len(q_table)}")
         if len(q_table) > 0:
             print("Sample Q-table entries:")
-            for key, value in list(q_table.items())[:5]:  # Print the first 5 entries
-                print(f"State-Action: {key}, Q-value: {value}")
+            # for key, value in list(q_table.items())[-5:]:  # Print the last 5 entries
+                # print(f"State-Action: {key}, Q-value: {value}")
     except FileNotFoundError:
         print(f"No Q-table found at {filename}. Starting with an empty Q-table.")
         q_table = {}
@@ -203,6 +204,8 @@ def load_q_table(filename="q_table.pkl"):
 def play():
     global snake, snake_dir, snake_length, green_apples, red_apple, screen
 
+    # Load the Q-table before starting the game
+    load_q_table()
 
     # Initialize the screen for playing
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
@@ -236,7 +239,7 @@ def play():
 
         # Check for collisions
         if check_collisions():
-            print("Game Over!")
+            print(f"Game Over!, Final Length: {snake_length}")
             running = False
 
         # Control the game speed
@@ -260,6 +263,7 @@ def train(num_episodes, epsilon, alpha, gamma):
         snake_length = 3
         green_apples = [(random.randint(0, GRID_SIZE - 1), random.randint(0, GRID_SIZE - 1)) for _ in range(2)]
         red_apple = (random.randint(0, GRID_SIZE - 1), random.randint(0, GRID_SIZE - 1))
+        epsilon = max(0.01, epsilon * 0.995)  # Decay epsilon but keep it above 0.01
 
         # Track cumulative reward for this episode
         cumulative_reward = 0
@@ -272,7 +276,6 @@ def train(num_episodes, epsilon, alpha, gamma):
             screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
             pygame.display.set_caption(f"Training - Episode {episode + 1}")
 
-        # Run the game loop for this episode
         while True:
             if render:
                 screen.fill(BACKGROUND_COLOR)
