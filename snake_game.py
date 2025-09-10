@@ -3,7 +3,9 @@ import pygame
 import random
 import sys
 import pickle
+import matplotlib.pyplot as plt
 from q_table_storage import q_table
+import os
 
 # Initialize pygame
 pygame.init()
@@ -201,6 +203,7 @@ def load_q_table(filename="q_table.pkl"):
 def play():
     global snake, snake_dir, snake_length, green_apples, red_apple, screen
 
+
     # Initialize the screen for playing
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
     pygame.display.set_caption("Snake Game - Play Mode")
@@ -314,6 +317,54 @@ def train(num_episodes, epsilon, alpha, gamma):
             pygame.display.init()
 
     print("Training completed!")
+
+    # Generate graphs
+    plot_training_statistics(length_per_episode, max_length)
+
+def plot_training_statistics(length_per_episode, max_length):
+    # Calculate moving average of snake length over 1000 episodes
+    moving_avg_length = [
+        sum(length_per_episode[i:i+1000]) / 1000
+        for i in range(len(length_per_episode) - 999)
+    ]
+
+    # Track the maximum length over time
+    max_lengths_over_time = []
+    current_max = 0
+    for length in length_per_episode:
+        current_max = max(current_max, length)
+        max_lengths_over_time.append(current_max)
+
+    # Downsample the data to plot every 1000th episode for clarity
+    episodes = range(0, len(max_lengths_over_time), 1000)
+    downsampled_max_lengths = [max_lengths_over_time[i] for i in episodes]
+
+    # Plot max length over time
+    plt.figure(figsize=(12, 6))
+    plt.plot(episodes, downsampled_max_lengths, label="Max Length Over Time", color="blue", linewidth=2)
+
+    # Plot moving average of snake length
+    plt.plot(range(999, len(length_per_episode)), moving_avg_length, label="Moving Avg (1000 episodes)", color="orange", linewidth=2)
+
+    # Add grid, labels, and legend
+    plt.grid(True, linestyle="--", alpha=0.5)
+    plt.xlabel("Episode")
+    plt.ylabel("Snake Length")
+    plt.title("Snake Length Statistics During Training")
+    plt.legend()
+    plt.tight_layout()
+
+    # Save the graph as an image
+    filename = "training_statistics.png"
+    if os.path.exists(filename):
+        base, ext = os.path.splitext(filename)
+        counter = 1
+        while os.path.exists(f"{base}_{counter}{ext}"):
+            counter += 1
+        filename = f"{base}_{counter}{ext}"
+
+    plt.savefig(filename)
+    plt.show()
 
 if __name__ == "__main__":
     mode = input("Enter 'train' to train the AI or 'play' to watch the AI play: ").strip().lower()
