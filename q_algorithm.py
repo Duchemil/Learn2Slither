@@ -1,5 +1,6 @@
 import random
 from collections import Counter
+from config import GRID_SIZE
 
 def choose_action(state, epsilon, current_dir, q_table):
     directions = {
@@ -17,57 +18,66 @@ def choose_action(state, epsilon, current_dir, q_table):
     if random.uniform(0, 1) < epsilon:
         return random.choice(valid_actions)
     else:
-        return max(valid_actions, key=lambda a: q_table.get((state, a), 0), default=random.choice(valid_actions))
+        # Fetch Q-values for valid actions
+        q_values = {a: q_table.get((state, a), 0) for a in valid_actions}
+        print(f"Valid actions: {valid_actions}")
+        print(f"Q-values for valid actions: {q_values}")
+        return max(q_values, key=q_values.get, default=random.choice(valid_actions))
 
 
 def update_q_value(state, action, reward, next_state, alpha, gamma, q_table):
+    # Normalize the state and next state
+    state = tuple(state)  # Ensure the state is hashable
+    next_state = tuple(next_state)
+
+    # Get the maximum Q-value for the next state
     max_next_q = max([q_table.get((next_state, a), 0) for a in range(4)], default=0)
+
+    # Update the Q-value for the current state-action pair
     current_q = q_table.get((state, action), 0)
     new_q = current_q + alpha * (reward + gamma * max_next_q - current_q)
     q_table[(state, action)] = new_q
-    # print(f"Updated Q-value for state-action ({state}, {action}): {new_q}")
 
  
-def get_state(snake, green_apples, red_apple, GRID_SIZE):
+def normalize(value, grid_size):
+    return round(value / grid_size, 2)
+
+def get_state(snake, green_apples, red_apple):
     head_x, head_y = snake[0]
 
-    # Normalize distances to the grid size
-    def normalize(value):
-        return round(value / GRID_SIZE, 2)
-
-    # Calculate distances to objects in a given direction
-    def calculate_distance(dx, dy):
-        wall_distance = 0
-        green_apple_distance = float('inf')
-        red_apple_distance = float('inf')
-        body_distance = float('inf')
+    def check_direction(dx, dy):
+        distance = 0
+        apple_nearby = False
+        red_apple_nearby = False
+        body_nearby = False
 
         x, y = head_x + dx, head_y + dy
-        while 0 <= x < GRID_SIZE and 0 <= y < GRID_SIZE:
-            wall_distance += 1
-            if (x, y) in green_apples and green_apple_distance == float('inf'):
-                green_apple_distance = wall_distance
-            if (x, y) == red_apple and red_apple_distance == float('inf'):
-                red_apple_distance = wall_distance
-            if (x, y) in snake and body_distance == float('inf'):
-                body_distance = wall_distance
+        while True:
+            distance += 1
+            if x < 0 or y < 0 or x >= GRID_SIZE or y >= GRID_SIZE:
+                break
+            if (x, y) in green_apples:
+                apple_nearby = True
+            if (x, y) == red_apple:
+                red_apple_nearby = True
+            if (x, y) in snake:
+                body_nearby = True
             x += dx
             y += dy
 
         return (
-            normalize(wall_distance),
-            normalize(green_apple_distance) if green_apple_distance != float('inf') else 1.0,
-            normalize(red_apple_distance) if red_apple_distance != float('inf') else 1.0,
-            normalize(body_distance) if body_distance != float('inf') else 1.0
+            normalize(distance, GRID_SIZE),
+            apple_nearby,
+            red_apple_nearby,
+            body_nearby
         )
 
-    # Get information in all four directions
-    up_info = calculate_distance(0, -1)
-    down_info = calculate_distance(0, 1)
-    left_info = calculate_distance(-1, 0)
-    right_info = calculate_distance(1, 0)
+    up_info = check_direction(0, -1)
+    down_info = check_direction(0, 1)
+    left_info = check_direction(-1, 0)
+    right_info = check_direction(1, 0)
 
-    # Return the state as a tuple
+    # Return the normalized state
     return (*up_info, *down_info, *left_info, *right_info)
 
 

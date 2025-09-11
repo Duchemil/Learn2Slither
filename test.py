@@ -1,6 +1,6 @@
 import pickle
 
-with open("new_table.pkl", "rb") as f:
+with open("test_100k.pkl", "rb") as f:
     q_table = pickle.load(f)
     print(f"Number of entries in Q-table: {len(q_table)}")
     print("Sample entries:", list(q_table.items())[-5:])

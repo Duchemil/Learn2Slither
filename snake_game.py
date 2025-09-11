@@ -4,6 +4,8 @@ import random
 import sys
 import pickle
 import matplotlib.pyplot as plt
+from config import GRID_SIZE, CELL_SIZE, SCREEN_SIZE, SCREEN_WIDTH, SCREEN_HEIGHT, FPS
+from config import BACKGROUND_COLOR, SNAKE_COLOR, SNAKE_EYE_COLOR, APPLE_GREEN_COLOR, APPLE_RED_COLOR
 import os
 
 # Initialize pygame
@@ -17,24 +19,6 @@ last_moves = []
 green_apples = []  # List to store green apple positions
 red_apple = None   # Variable to store red apple position
 
-# Constants
-GRID_SIZE = 10
-CELL_SIZE = 40
-SCREEN_SIZE = GRID_SIZE * CELL_SIZE
-SCREEN_WIDTH = SCREEN_SIZE + 200  # Add 200 pixels for the right section
-SCREEN_HEIGHT = SCREEN_SIZE
-
-FPS = 5
-
-# Colors
-BACKGROUND_COLOR = (30, 30, 30)  # Dark gray
-GRID_COLOR = (50, 50, 50)  # Slightly lighter gray
-SNAKE_COLOR = (0, 200, 0)  # Bright green
-SNAKE_EYE_COLOR = (255, 255, 255)  # White for eyes
-APPLE_GREEN_COLOR = (170, 255, 170)  # Bright green
-APPLE_RED_COLOR = (255, 0, 0)  # Bright red
-
-
 # Clock
 clock = pygame.time.Clock()
 
@@ -42,6 +26,15 @@ clock = pygame.time.Clock()
 snake = [(GRID_SIZE // 2, GRID_SIZE // 2 + i) for i in range(3)]
 snake_dir = (0, -1)  # Start moving up
 snake_length = 3
+
+
+def prune_q_table(q_table, threshold=0.01):
+    """Remove entries with Q-values close to zero and keep only last 1000 entries."""
+    # Remove entries with Q-values close to zero
+    keys_to_remove = [key for key, value in q_table.items() if abs(value) < threshold]
+    for key in keys_to_remove:
+        del q_table[key]
+    return q_table
 
 
 # Function to draw the grid
@@ -221,7 +214,7 @@ def play(q_table):
         pygame.display.flip()
 
         # Get the current state
-        state = get_state(snake, green_apples, red_apple, GRID_SIZE)
+        state = get_state(snake, green_apples, red_apple)
 
         # Choose the best action based on the Q-table (exploit only)
         action = choose_action(state, 0, snake_dir, q_table)  # epsilon=0 ensures no random moves
@@ -265,7 +258,7 @@ def play_multiple_games(q_table, num_games=1000):
             game_states.append((list(snake), snake_dir, snake_length, list(green_apples), red_apple))
 
             # Get the current state
-            state = get_state(snake, green_apples, red_apple, GRID_SIZE)
+            state = get_state(snake, green_apples, red_apple)
 
             # Choose the best action based on the Q-table (exploit only)
             action = choose_action(state, 0.01, snake_dir, q_table)  # epsilon=0 ensures no random moves
@@ -344,6 +337,9 @@ def train(num_episodes, epsilon, alpha, gamma, q_table):
 
         render = (episode + 1) % 10000 == 0  # Render every 1000 episodes
 
+        if episode % 1000 == 0:  # Prune every 1000 episodes
+            q_table = prune_q_table(q_table)
+
         if render:
             # Initialize the screen for rendering
             screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
@@ -358,13 +354,13 @@ def train(num_episodes, epsilon, alpha, gamma, q_table):
                 draw_right_section()
                 pygame.display.flip()
 
-            state = get_state(snake, green_apples, red_apple, GRID_SIZE)
+            state = get_state(snake, green_apples, red_apple)
             action = choose_action(state, epsilon, snake_dir, q_table)
             snake_dir = action_to_direction(action, snake_dir)
             move_snake()
             reward = calculate_reward(snake, green_apples, red_apple, GRID_SIZE)
             cumulative_reward += reward  # Add reward to cumulative reward
-            next_state = get_state(snake, green_apples, red_apple, GRID_SIZE)
+            next_state = get_state(snake, green_apples, red_apple)
             update_q_value(state, action, reward, next_state, alpha, gamma, q_table)
 
             if check_collisions():
