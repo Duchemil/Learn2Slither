@@ -20,8 +20,8 @@ def choose_action(state, epsilon, current_dir, q_table):
     else:
         # Fetch Q-values for valid actions
         q_values = {a: q_table.get((state, a), 0) for a in valid_actions}
-        print(f"Valid actions: {valid_actions}")
-        print(f"Q-values for valid actions: {q_values}")
+        # print(f"Valid actions: {valid_actions}")
+        # print(f"Q-values for valid actions: {q_values}")
         return max(q_values, key=q_values.get, default=random.choice(valid_actions))
 
 

@@ -1,5 +1,5 @@
 # Constants
-GRID_SIZE = 20
+GRID_SIZE = 10
 CELL_SIZE = 40
 SCREEN_SIZE = GRID_SIZE * CELL_SIZE
 SCREEN_WIDTH = SCREEN_SIZE + 200  # Add 200 pixels for the right section

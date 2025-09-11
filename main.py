@@ -3,16 +3,18 @@
 import argparse
 import pickle
 from snake_game import train, play, play_multiple_games
+from collections import OrderedDict
 
 def load_q_table(filename):
     try:
         with open(filename, "rb") as f:
             q_table = pickle.load(f)
         print(f"Q-table loaded from {filename}. Number of entries: {len(q_table)}")
-        return q_table
+        # Convert to OrderedDict to maintain insertion order
+        return OrderedDict(q_table)
     except FileNotFoundError:
         print(f"No Q-table found at {filename}. Starting with an empty Q-table.")
-        return {}
+        return OrderedDict()
 
 def save_q_table(q_table, filename):
     with open(filename, "wb") as f:
@@ -26,6 +28,8 @@ def main():
     parser.add_argument("-sessions", type=int, default=1000, help="Number of training episodes (default: 10)")
     parser.add_argument("-load", type=str, default="q_table.pkl", help="Path to the Q-table file to load (default: q_table.pkl)")
     parser.add_argument("-save", type=str, default="q_table.pkl", help="Path to save the Q-table after training (default: q_table.pkl)")
+    parser.add_argument("-verbose", action="store_true", help="Enable verbose output in play mode")
+
     args = parser.parse_args()
 
     # Load the Q-table from file passed as argument (or start with an empty one)
@@ -44,8 +48,8 @@ def main():
         save_q_table(q_table, args.save)
     elif args.mode == "play":
         print("Starting the game...")
-        # play(q_table)
-        play_multiple_games(q_table, num_games=100)
+        play(q_table, verbose=args.verbose)
+        # play_multiple_games(q_table, verbose=args.verbose, num_games=100)
 
 if __name__ == "__main__":
     main()

@@ -148,25 +148,90 @@ def check_collisions():
     return False
 
 
+# New helper to get vision ray cells (same logic directions as get_state)
+def get_vision_cells():
+    head_x, head_y = snake[0]
+    dirs = [(0, -1), (0, 1), (-1, 0), (1, 0)]
+    vision = set()
+    for dx, dy in dirs:
+        x, y = head_x + dx, head_y + dy
+        while 0 <= x < GRID_SIZE and 0 <= y < GRID_SIZE:
+            vision.add((x, y))
+            x += dx
+            y += dy
+    return vision
+
+
+def draw_mini_board():
+    # Mini board parameters
+    padding = 10
+    area_width = 200 - 2 * padding
+    mini_cell = max(6, area_width // GRID_SIZE)
+    origin_x = SCREEN_SIZE + padding
+    origin_y = padding
+
+    vision_cells = get_vision_cells()
+    head = snake[0]
+
+    HIDDEN_COLOR = (15, 15, 15)   # Fully hidden
+    VISION_BG_COLOR = (65, 65, 65)
+    HEAD_COLOR = (0, 255, 0)
+
+    for y in range(GRID_SIZE):
+        for x in range(GRID_SIZE):
+            rect = pygame.Rect(origin_x + x * mini_cell,
+                               origin_y + y * mini_cell,
+                               mini_cell - 1,
+                               mini_cell - 1)
+
+            visible = (x, y) in vision_cells or (x, y) == head
+            if not visible:
+                # Completely hidden cell (no objects shown)
+                pygame.draw.rect(screen, HIDDEN_COLOR, rect)
+                continue
+
+            # Background for visible ray cells
+            pygame.draw.rect(screen, VISION_BG_COLOR, rect)
+
+            # Draw entities only if visible
+            if (x, y) == head:
+                pygame.draw.rect(screen, HEAD_COLOR, rect)
+            elif (x, y) in snake[1:]:
+                pygame.draw.rect(screen, SNAKE_COLOR, rect)
+            elif (x, y) in green_apples:
+                pygame.draw.rect(screen, APPLE_GREEN_COLOR, rect)
+            elif (x, y) == red_apple:
+                pygame.draw.rect(screen, APPLE_RED_COLOR, rect)
+
+    # Outline
+    outline_rect = pygame.Rect(origin_x - 2, origin_y - 2,
+                               GRID_SIZE * mini_cell + 3,
+                               GRID_SIZE * mini_cell + 3)
+    pygame.draw.rect(screen, (200, 200, 200), outline_rect, 2)
+
+
 def draw_right_section():
-    # Background for the right section
+    # Background
     right_section_rect = pygame.Rect(SCREEN_SIZE, 0, 200, SCREEN_HEIGHT)
-    pygame.draw.rect(screen, (40, 40, 40), right_section_rect)  # Darker gray background
+    pygame.draw.rect(screen, (40, 40, 40), right_section_rect)
 
-    # Font for text
-    font = pygame.font.Font(None, 36)
-    text_color = (255, 255, 255)  # White text
+    draw_mini_board()
 
-    # Render each move
-    for i, move in enumerate(last_moves):
-        move_text = font.render(f"{i + 1}: {move}", True, text_color)
-        screen.blit(move_text, (SCREEN_SIZE + 10, 50 + i * 30))
+    font = pygame.font.Font(None, 26)
+    text_color = (255, 255, 255)
 
-    # Display "Snake Length"
+    # Position text under mini board
+    text_start_y = 10 + (200 - 20) // GRID_SIZE * GRID_SIZE  # approximate bottom of board
+    text_start_y = max(text_start_y, 10 + 10 +  ( (200 - 20) // GRID_SIZE ) * GRID_SIZE )  # safety
+    text_start_y += 20
+
     length_text = font.render(f"Length: {snake_length}", True, text_color)
-    screen.blit(length_text, (SCREEN_SIZE + 10, 200))
+    screen.blit(length_text, (SCREEN_SIZE + 10, text_start_y))
 
-    # Draw a vertical line to separate the sections
+    for i, move in enumerate(last_moves[-5:]):
+        mv = font.render(f"{move}", True, text_color)
+        screen.blit(mv, (SCREEN_SIZE + 20, text_start_y + 55 + i * 22))
+
     pygame.draw.line(screen, (255, 255, 255), (SCREEN_SIZE, 0), (SCREEN_SIZE, SCREEN_HEIGHT), 2)
 
 
@@ -195,8 +260,49 @@ def load_q_table(filename="q_table.pkl"):
         print(f"No Q-table found at {filename}. Starting with an empty Q-table.")
 
 
-def play(q_table):
+def build_ascii_board():
+    board = [['.' for _ in range(GRID_SIZE)] for _ in range(GRID_SIZE)]
+    vision = get_vision_cells()
+    head = snake[0]
+
+    # Mark visible empty cells first
+    for (x, y) in vision | {head}:
+        if 0 <= x < GRID_SIZE and 0 <= y < GRID_SIZE:
+            board[y][x] = '0'   # visible empty (may be overwritten by entities)
+
+    # Entities override
+    # Body (excluding head)
+    for seg in snake[1:]:
+        if seg in vision:
+            x, y = seg
+            board[y][x] = 'S'
+    # Apples
+    for ax, ay in green_apples:
+        if (ax, ay) in vision:
+            board[ay][ax] = 'G'
+    if red_apple in vision:
+        rx, ry = red_apple
+        board[ry][rx] = 'R'
+    # Head last
+    hx, hy = head
+    board[hy][hx] = 'H'
+
+    return "\n".join("".join(row) for row in board)
+
+
+def play(q_table, verbose=False):
     global snake, snake_dir, snake_length, green_apples, red_apple, screen
+
+    # Helper to format the vision/state for logging
+    def format_state(state):
+        dirs = ["Up", "Down", "Left", "Right"]
+        lines = []
+        for i, d in enumerate(dirs):
+            dist, apple, red, body = state[i*4:(i+1)*4]
+            lines.append(f"{d}: dist={dist} apple={int(apple)} red={int(red)} body={int(body)}")
+        return "\n".join(lines)
+
+    action_names = {0: "UP", 1: "DOWN", 2: "LEFT", 3: "RIGHT"}
 
     # Initialize the screen for playing
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
@@ -206,6 +312,10 @@ def play(q_table):
     clock = pygame.time.Clock()
 
     while running:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
         screen.fill(BACKGROUND_COLOR)
         draw_grid()
         draw_snake()
@@ -217,8 +327,12 @@ def play(q_table):
         state = get_state(snake, green_apples, red_apple)
 
         # Choose the best action based on the Q-table (exploit only)
-        action = choose_action(state, 0, snake_dir, q_table)  # epsilon=0 ensures no random moves
+        action = choose_action(state, 0.01, snake_dir, q_table)
         snake_dir = action_to_direction(action, snake_dir)
+
+        if verbose:
+            print(build_ascii_board())
+            print(f"Chosen action: {action_names.get(action)}")
 
         # Move the snake
         move_snake()
@@ -235,11 +349,22 @@ def play(q_table):
     sys.exit()
 
 
-def play_multiple_games(q_table, num_games=1000):
+def play_multiple_games(q_table, verbose=False, num_games=1000):
     global snake, snake_dir, snake_length, green_apples, red_apple, screen
 
     max_length = 0
     best_game_states = []
+
+    # Helper to format the vision/state for logging
+    def format_state(state):
+        dirs = ["Up", "Down", "Left", "Right"]
+        lines = []
+        for i, d in enumerate(dirs):
+            dist, apple, red, body = state[i*4:(i+1)*4]
+            lines.append(f"{d}: dist={dist} apple={int(apple)} red={int(red)} body={int(body)}")
+        return "\n".join(lines)
+
+    action_names = {0: "UP", 1: "DOWN", 2: "LEFT", 3: "RIGHT"}
 
     for game in range(num_games):
         # Reset the game state
@@ -253,7 +378,10 @@ def play_multiple_games(q_table, num_games=1000):
         running = True
 
         while running:
-
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    sys.exit()
             # Save the current state for replay
             game_states.append((list(snake), snake_dir, snake_length, list(green_apples), red_apple))
 
@@ -263,6 +391,10 @@ def play_multiple_games(q_table, num_games=1000):
             # Choose the best action based on the Q-table (exploit only)
             action = choose_action(state, 0.01, snake_dir, q_table)  # epsilon=0 ensures no random moves
             snake_dir = action_to_direction(action, snake_dir)
+
+            if verbose:
+                print(format_state(state))
+                print(f"Chosen action: {action_names.get(action)}")
 
             # Move the snake
             move_snake()
@@ -395,8 +527,8 @@ def train(num_episodes, epsilon, alpha, gamma, q_table):
 def plot_training_statistics(length_per_episode, max_length):
     # Calculate moving average of snake length over 1000 episodes
     moving_avg_length = [
-        sum(length_per_episode[i:i+1000]) / 1000
-        for i in range(len(length_per_episode) - 999)
+        sum(length_per_episode[max(0, i-999):i+1]) / min(1000, i+1)
+        for i in range(len(length_per_episode))
     ]
 
     # Track the maximum length over time
@@ -412,10 +544,10 @@ def plot_training_statistics(length_per_episode, max_length):
 
     # Plot max length over time
     plt.figure(figsize=(12, 6))
-    plt.plot(episodes, downsampled_max_lengths, label="Max Length Over Time", color="blue", linewidth=2)
+    plt.plot(range(len(max_lengths_over_time)), max_lengths_over_time, label="Max Length Over Time", color="blue", linewidth=2)
 
     # Plot moving average of snake length
-    plt.plot(range(999, len(length_per_episode)), moving_avg_length, label="Moving Avg (1000 episodes)", color="orange", linewidth=2)
+    plt.plot(range(len(moving_avg_length)), moving_avg_length, label="Moving Avg (1000 episodes)", color="orange", linewidth=2)
 
     # Add grid, labels, and legend
     plt.grid(True, linestyle="--", alpha=0.5)
