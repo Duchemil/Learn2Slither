@@ -2,7 +2,7 @@
 
 import argparse
 import pickle
-from snake_game import train, play
+from snake_game import train, play, play_multiple_games
 
 def load_q_table(filename):
     try:
@@ -36,7 +36,7 @@ def main():
 
     if args.mode == "train":
         print(f"Training the AI for {args.sessions} episodes...")
-        epsilon = 0.1  # Initial exploration rate for training
+        epsilon = 0.01  # Initial exploration rate for training
         alpha = 0.1    # Learning rate
         gamma = 0.9    # Discount factor
 
@@ -44,7 +44,8 @@ def main():
         save_q_table(q_table, args.save)
     elif args.mode == "play":
         print("Starting the game...")
-        play(q_table)
+        # play(q_table)
+        play_multiple_games(q_table, num_games=100)
 
 if __name__ == "__main__":
     main()

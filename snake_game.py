@@ -13,6 +13,9 @@ pygame.init()
 # Track the last 5 moves made by the AI
 last_moves = []
 
+# Initialize apples
+green_apples = []  # List to store green apple positions
+red_apple = None   # Variable to store red apple position
 
 # Constants
 GRID_SIZE = 10
@@ -40,26 +43,22 @@ snake = [(GRID_SIZE // 2, GRID_SIZE // 2 + i) for i in range(3)]
 snake_dir = (0, -1)  # Start moving up
 snake_length = 3
 
-# Apple initialization
-green_apples = [(random.randint(0, GRID_SIZE - 1),
-                 random.randint(0, GRID_SIZE - 1)) for _ in range(2)]
-red_apple = (random.randint(0, GRID_SIZE - 1),
-             random.randint(0, GRID_SIZE - 1))
-
 
 # Function to draw the grid
 def draw_grid():
     for x in range(0, SCREEN_SIZE, CELL_SIZE):
         for y in range(0, SCREEN_SIZE, CELL_SIZE):
             rect = pygame.Rect(x, y, CELL_SIZE, CELL_SIZE)
-            pygame.draw.rect(screen, GRID_COLOR, rect, 1)
+            # Alternate between two shades of blue for the checkered pattern
+            color = (100, 149, 237) if (x // CELL_SIZE + y // CELL_SIZE) % 2 == 0 else (70, 130, 180)
+            pygame.draw.rect(screen, color, rect)
 
 
 # Function to draw the snake
 def draw_snake():
     for i, segment in enumerate(snake):
         rect = pygame.Rect(segment[0] * CELL_SIZE, segment[1] * CELL_SIZE, CELL_SIZE, CELL_SIZE)
-        pygame.draw.rect(screen, SNAKE_COLOR, rect)
+        pygame.draw.rect(screen, SNAKE_COLOR, rect)  # Fill the snake body
         if i == 0:  # Draw googly eyes on the head
             eye_radius = CELL_SIZE // 8
             eye_offset = CELL_SIZE // 4
@@ -71,27 +70,33 @@ def draw_snake():
 
 # Function to draw apples
 def draw_apples():
-    global red_apple  # Declare red_apple as global to avoid scope issues
+    global red_apple, green_apples  # Declare red_apple and green_apples as global to avoid scope issues
 
     def get_empty_spaces():
+        # Get all grid positions that are not occupied by the snake or apples
         occupied = set(snake + green_apples + [red_apple])
         return [(x, y) for x in range(GRID_SIZE) for y in range(GRID_SIZE) if (x, y) not in occupied]
 
+    # Ensure green_apples and red_apple are initialized
+    if not green_apples:
+        green_apples.extend([(random.randint(0, GRID_SIZE - 1), random.randint(0, GRID_SIZE - 1)) for _ in range(2)])
+    if not red_apple:
+        red_apple = (random.randint(0, GRID_SIZE - 1), random.randint(0, GRID_SIZE - 1))
+
     empty_spaces = get_empty_spaces()
 
-    # Redraw green apples if they overlap with the snake
+    # Redraw green apples if they overlap with the snake or each other
     for i in range(len(green_apples)):
-        if green_apples[i] in snake:
+        if green_apples[i] in snake or green_apples[i] in green_apples[:i]:
             if empty_spaces:
                 green_apples[i] = random.choice(empty_spaces)
                 empty_spaces.remove(green_apples[i])
 
-    # Redraw red apple if it overlaps with the snake
-    if red_apple in snake:
+    # Redraw red apple if it overlaps with the snake or green apples
+    if red_apple in snake or red_apple in green_apples:
         if empty_spaces:
-            new_red_apple = random.choice(empty_spaces)
-            empty_spaces.remove(new_red_apple)
-            red_apple = new_red_apple
+            red_apple = random.choice(empty_spaces)
+            empty_spaces.remove(red_apple)
 
     # Draw green apples
     for apple in green_apples:
@@ -115,12 +120,17 @@ def move_snake():
 def check_collisions():
     global snake_length, green_apples, red_apple
 
+    # Helper function to get all empty spaces
+    def get_empty_spaces():
+        occupied = set(snake + green_apples + [red_apple])
+        return [(x, y) for x in range(GRID_SIZE) for y in range(GRID_SIZE) if (x, y) not in occupied]
+
     # Check wall collision
     head_x, head_y = snake[0]
     if head_x < 0 or head_x >= GRID_SIZE or head_y < 0 or head_y >= GRID_SIZE:
         return True
 
-    # # # Check self collision
+    # Check self collision
     if snake[0] in snake[1:]:
         return True
 
@@ -129,14 +139,18 @@ def check_collisions():
         if snake[0] == apple:
             snake_length += 1
             green_apples.remove(apple)
-            green_apples.append((random.randint(0, GRID_SIZE - 1), random.randint(0, GRID_SIZE - 1)))
+            empty_spaces = get_empty_spaces()
+            if empty_spaces:
+                green_apples.append(random.choice(empty_spaces))
 
     # Check red apple collision
     if snake[0] == red_apple:
         snake_length -= 1
         if snake_length <= 0:
             return True
-        red_apple = (random.randint(0, GRID_SIZE - 1), random.randint(0, GRID_SIZE - 1))
+        empty_spaces = get_empty_spaces()
+        if empty_spaces:
+            red_apple = random.choice(empty_spaces)
 
     return False
 
@@ -150,10 +164,6 @@ def draw_right_section():
     font = pygame.font.Font(None, 36)
     text_color = (255, 255, 255)  # White text
 
-    # Display "Last Moves"
-    moves_title = font.render("Last Moves:", True, text_color)
-    screen.blit(moves_title, (SCREEN_SIZE + 10, 10))
-
     # Render each move
     for i, move in enumerate(last_moves):
         move_text = font.render(f"{i + 1}: {move}", True, text_color)
@@ -165,17 +175,6 @@ def draw_right_section():
 
     # Draw a vertical line to separate the sections
     pygame.draw.line(screen, (255, 255, 255), (SCREEN_SIZE, 0), (SCREEN_SIZE, SCREEN_HEIGHT), 2)
-
-
-def draw_last_moves():
-    font = pygame.font.Font(None, 36)  # Use a default font with size 36
-    text_color = (255, 255, 255)  # White text
-    x, y = 10, 10  # Starting position for the text
-
-    # Render each move
-    for i, move in enumerate(last_moves):
-        text_surface = font.render(f"Move {i + 1}: {move}", True, text_color)
-        screen.blit(text_surface, (x, y + i * 30))  # Offset each line by 30 pixels
 
 
 def save_q_table(filename="q_table.pkl"):
@@ -241,6 +240,83 @@ def play(q_table):
 
     pygame.quit()
     sys.exit()
+
+
+def play_multiple_games(q_table, num_games=1000):
+    global snake, snake_dir, snake_length, green_apples, red_apple, screen
+
+    max_length = 0
+    best_game_states = []
+
+    for game in range(num_games):
+        # Reset the game state
+        snake = [(GRID_SIZE // 2, GRID_SIZE // 2 + i) for i in range(3)]
+        snake_dir = (0, -1)
+        snake_length = 3
+        green_apples = [(random.randint(0, GRID_SIZE - 1), random.randint(0, GRID_SIZE - 1)) for _ in range(2)]
+        red_apple = (random.randint(0, GRID_SIZE - 1), random.randint(0, GRID_SIZE - 1))
+
+        game_states = []  # To store the states of this game
+        running = True
+
+        while running:
+
+            # Save the current state for replay
+            game_states.append((list(snake), snake_dir, snake_length, list(green_apples), red_apple))
+
+            # Get the current state
+            state = get_state(snake, green_apples, red_apple, GRID_SIZE)
+
+            # Choose the best action based on the Q-table (exploit only)
+            action = choose_action(state, 0.01, snake_dir, q_table)  # epsilon=0 ensures no random moves
+            snake_dir = action_to_direction(action, snake_dir)
+
+            # Move the snake
+            move_snake()
+
+            # Check for collisions
+            if check_collisions():
+                running = False
+
+        # Check if this game achieved a new maximum length
+        if snake_length > max_length:
+            max_length = snake_length
+            best_game_states = game_states
+
+        # print(f"Game {game + 1}/{num_games} completed. Final Length: {snake_length}")
+
+    print(f"Best game achieved a length of {max_length}. Replaying it now...")
+
+    # Replay the best game
+    replay_game(best_game_states)
+
+
+def replay_game(game_states):
+    global snake, snake_dir, snake_length, green_apples, red_apple, screen
+
+    # Initialize the screen for replay
+    screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+    pygame.display.set_caption("Snake Game - Replay of Best Game")
+
+    clock = pygame.time.Clock()
+
+    for state in game_states:
+        for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    sys.exit()  # Exit the program gracefully
+        snake, snake_dir, snake_length, green_apples, red_apple = state
+
+        screen.fill(BACKGROUND_COLOR)
+        draw_grid()
+        draw_snake()
+        draw_apples()
+        draw_right_section()
+        pygame.display.flip()
+
+        clock.tick(FPS)  # Control the replay speed
+
+    print("Replay completed!")
 
 
 def train(num_episodes, epsilon, alpha, gamma, q_table):
