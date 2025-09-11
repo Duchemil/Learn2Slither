@@ -9,17 +9,17 @@ def load_q_table(filename):
     try:
         with open(filename, "rb") as f:
             q_table = pickle.load(f)
-        print(f"Q-table loaded from {filename}. Number of entries: {len(q_table)}")
+        # print(f"Q-table loaded from {filename}. Number of entries: {len(q_table)}")
         # Convert to OrderedDict to maintain insertion order
         return OrderedDict(q_table)
     except FileNotFoundError:
-        print(f"No Q-table found at {filename}. Starting with an empty Q-table.")
+        # print(f"No Q-table found at {filename}. Starting with an empty Q-table.")
         return OrderedDict()
 
 def save_q_table(q_table, filename):
     with open(filename, "wb") as f:
         pickle.dump(q_table, f)
-    print(f"Q-table saved to {filename}.")
+    # print(f"Q-table saved to {filename}.")
 
 def main():
     # Parse command-line arguments
@@ -35,8 +35,8 @@ def main():
     # Load the Q-table from file passed as argument (or start with an empty one)
     q_table = load_q_table(args.load)
 
-    print(f"Number of entries in Q-table: {len(q_table)}")
-    print("Sample entries:", list(q_table.items())[-5:])
+    # print(f"Number of entries in Q-table: {len(q_table)}")
+    # print("Sample entries:", list(q_table.items())[-5:])
 
     if args.mode == "train":
         print(f"Training the AI for {args.sessions} episodes...")
@@ -48,8 +48,8 @@ def main():
         save_q_table(q_table, args.save)
     elif args.mode == "play":
         print("Starting the game...")
-        play(q_table, verbose=args.verbose)
-        # play_multiple_games(q_table, verbose=args.verbose, num_games=100)
+        # play(q_table, verbose=args.verbose)
+        play_multiple_games(q_table, verbose=args.verbose, num_games=100)
 
 if __name__ == "__main__":
     main()

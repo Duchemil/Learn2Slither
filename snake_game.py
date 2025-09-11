@@ -11,6 +11,40 @@ import os
 # Initialize pygame
 pygame.init()
 
+# Helper to initialize a random snake (head + body placed opposite the moving direction)
+def init_snake(length=3):
+    dirs = [(0, -1), (0, 1), (-1, 0), (1, 0)]  # Up, Down, Left, Right
+    dx, dy = random.choice(dirs)
+
+    # Compute valid head coordinate ranges so body (placed along -dx,-dy) stays inside grid
+    if dx == 1:        # moving right, body extends left
+        min_x = length - 1
+        max_x = GRID_SIZE - 1
+    elif dx == -1:     # moving left, body extends right
+        min_x = 0
+        max_x = GRID_SIZE - length
+    else:              # vertical movement, any x
+        min_x = 0
+        max_x = GRID_SIZE - 1
+
+    if dy == 1:        # moving down, body extends up
+        min_y = length - 1
+        max_y = GRID_SIZE - 1
+    elif dy == -1:     # moving up, body extends down
+        min_y = 0
+        max_y = GRID_SIZE - length
+    else:              # horizontal movement, any y
+        min_y = 0
+        max_y = GRID_SIZE - 1
+
+    head_x = random.randint(min_x, max_x)
+    head_y = random.randint(min_y, max_y)
+
+    # Body segments placed opposite movement direction
+    snake = [(head_x, head_y)]
+    for i in range(1, length):
+        snake.append((head_x - dx * i, head_y - dy * i))
+    return snake, (dx, dy), length
 
 # Track the last 5 moves made by the AI
 last_moves = []
@@ -22,10 +56,8 @@ red_apple = None   # Variable to store red apple position
 # Clock
 clock = pygame.time.Clock()
 
-# Snake initialization
-snake = [(GRID_SIZE // 2, GRID_SIZE // 2 + i) for i in range(3)]
-snake_dir = (0, -1)  # Start moving up
-snake_length = 3
+# Random snake spawn
+snake, snake_dir, snake_length = init_snake()
 
 
 def prune_q_table(q_table, threshold=0.01):
@@ -246,12 +278,12 @@ def load_q_table(filename="q_table.pkl"):
     try:
         with open(filename, "rb") as f:
             loaded_q_table = pickle.load(f)
-        print(f"Q-table loaded from {filename}. Number of entries: {len(loaded_q_table)}")
+        # print(f"Q-table loaded from {filename}. Number of entries: {len(loaded_q_table)}")
 
         # Merge the loaded Q-table with the existing one
         q_table.update(loaded_q_table)
 
-        print(f"Q-table updated. Total number of entries: {len(q_table)}")
+        # print(f"Q-table updated. Total number of entries: {len(q_table)}")
         if len(q_table) > 0:
             print("Sample Q-table entries:")
             for key, value in list(q_table.items())[-5:]:  # Print the last 5 entries
@@ -292,6 +324,10 @@ def build_ascii_board():
 
 def play(q_table, verbose=False):
     global snake, snake_dir, snake_length, green_apples, red_apple, screen
+    # Re-randomize snake & apples at start of play
+    snake, snake_dir, snake_length = init_snake()
+    green_apples = []
+    red_apple = None
 
     # Helper to format the vision/state for logging
     def format_state(state):
@@ -367,10 +403,8 @@ def play_multiple_games(q_table, verbose=False, num_games=1000):
     action_names = {0: "UP", 1: "DOWN", 2: "LEFT", 3: "RIGHT"}
 
     for game in range(num_games):
-        # Reset the game state
-        snake = [(GRID_SIZE // 2, GRID_SIZE // 2 + i) for i in range(3)]
-        snake_dir = (0, -1)
-        snake_length = 3
+        # Reset the game state (random spawn)
+        snake, snake_dir, snake_length = init_snake()
         green_apples = [(random.randint(0, GRID_SIZE - 1), random.randint(0, GRID_SIZE - 1)) for _ in range(2)]
         red_apple = (random.randint(0, GRID_SIZE - 1), random.randint(0, GRID_SIZE - 1))
 
@@ -452,10 +486,8 @@ def train(num_episodes, epsilon, alpha, gamma, q_table):
     max_length = 0  # Track the global maximum length
 
     for episode in range(num_episodes):
-        # Reset the game state
-        snake = [(GRID_SIZE // 2, GRID_SIZE // 2 + i) for i in range(3)]
-        snake_dir = (0, -1)
-        snake_length = 3
+        # Random snake each episode
+        snake, snake_dir, snake_length = init_snake()
         green_apples = [(random.randint(0, GRID_SIZE - 1), random.randint(0, GRID_SIZE - 1)) for _ in range(2)]
         red_apple = (random.randint(0, GRID_SIZE - 1), random.randint(0, GRID_SIZE - 1))
 
