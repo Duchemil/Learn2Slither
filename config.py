@@ -5,7 +5,7 @@ SCREEN_SIZE = GRID_SIZE * CELL_SIZE
 SCREEN_WIDTH = SCREEN_SIZE + 200  # Add 200 pixels for the right section
 SCREEN_HEIGHT = SCREEN_SIZE
 
-FPS = 5
+FPS = 10
 
 # Colors
 BACKGROUND_COLOR = (30, 30, 30)  # Dark gray

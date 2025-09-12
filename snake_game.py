@@ -59,6 +59,8 @@ clock = pygame.time.Clock()
 # Random snake spawn
 snake, snake_dir, snake_length = init_snake()
 
+# Track when the current game started (ticks)
+game_start_ticks = 0
 
 def prune_q_table(q_table, threshold=0.01):
     """Remove entries with Q-values close to zero and keep only last 1000 entries."""
@@ -257,8 +259,14 @@ def draw_right_section():
     text_start_y = max(text_start_y, 10 + 10 +  ( (200 - 20) // GRID_SIZE ) * GRID_SIZE )  # safety
     text_start_y += 20
 
+    # Elapsed time in seconds
+    elapsed_sec = max(0, (pygame.time.get_ticks() - game_start_ticks) / 1000.0)
+
     length_text = font.render(f"Length: {snake_length}", True, text_color)
     screen.blit(length_text, (SCREEN_SIZE + 10, text_start_y))
+
+    time_text = font.render(f"Time: {elapsed_sec:.1f}s", True, text_color)
+    screen.blit(time_text, (SCREEN_SIZE + 10, text_start_y + 28))
 
     for i, move in enumerate(last_moves[-5:]):
         mv = font.render(f"{move}", True, text_color)
@@ -322,12 +330,24 @@ def build_ascii_board():
     return "\n".join("".join(row) for row in board)
 
 
+def wait_for_close():
+    # Wait until user closes the window, presses any key, or clicks
+    while True:
+        for event in pygame.event.get():
+            if event.type in (pygame.QUIT, pygame.KEYDOWN, pygame.MOUSEBUTTONDOWN):
+                return
+        pygame.time.delay(50)
+
+
 def play(q_table, verbose=False):
-    global snake, snake_dir, snake_length, green_apples, red_apple, screen
+    global snake, snake_dir, snake_length, green_apples, red_apple, screen, game_start_ticks
     # Re-randomize snake & apples at start of play
     snake, snake_dir, snake_length = init_snake()
     green_apples = []
     red_apple = None
+
+    # Start timer for this game
+    game_start_ticks = pygame.time.get_ticks()
 
     # Helper to format the vision/state for logging
     def format_state(state):
@@ -376,19 +396,32 @@ def play(q_table, verbose=False):
         # Check for collisions
         if check_collisions():
             print(f"Game Over!, Final Length: {snake_length}")
-            running = False
+            # Show final frame with a simple overlay and wait for user
+            overlay_bg = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+            overlay_bg.fill((0, 0, 0, 120))
+            screen.blit(overlay_bg, (0, 0))
+            font_big = pygame.font.Font(None, 48)
+            font_small = pygame.font.Font(None, 28)
+            elapsed_sec = max(0, (pygame.time.get_ticks() - game_start_ticks) / 1000.0)
+            text1 = font_big.render("Game Over", True, (255, 255, 255))
+            text2 = font_small.render(f"Final Length: {snake_length}, Final Direction: {snake_dir}   Time: {elapsed_sec:.1f}s", True, (255, 255, 255))
+            text3 = font_small.render("Press any key or click to exit", True, (200, 200, 200))
+            screen.blit(text1, (SCREEN_WIDTH // 2 - text1.get_width() // 2, SCREEN_HEIGHT // 2 - 60))
+            screen.blit(text2, (SCREEN_WIDTH // 2 - text2.get_width() // 2, SCREEN_HEIGHT // 2 - 20))
+            screen.blit(text3, (SCREEN_WIDTH // 2 - text3.get_width() // 2, SCREEN_HEIGHT // 2 + 20))
+            pygame.display.flip()
+            wait_for_close()
+            return  # do not auto-quit; return to caller
 
         # Control the game speed
         clock.tick(FPS)
-
-    pygame.quit()
-    sys.exit()
 
 
 def play_multiple_games(q_table, verbose=False, num_games=1000):
     global snake, snake_dir, snake_length, green_apples, red_apple, screen
 
     max_length = 0
+    total_length = 0
     best_game_states = []
 
     # Helper to format the vision/state for logging
@@ -423,7 +456,7 @@ def play_multiple_games(q_table, verbose=False, num_games=1000):
             state = get_state(snake, green_apples, red_apple)
 
             # Choose the best action based on the Q-table (exploit only)
-            action = choose_action(state, 0.01, snake_dir, q_table)  # epsilon=0 ensures no random moves
+            action = choose_action(state, 0.01, snake_dir, q_table)
             snake_dir = action_to_direction(action, snake_dir)
 
             if verbose:
@@ -437,13 +470,16 @@ def play_multiple_games(q_table, verbose=False, num_games=1000):
             if check_collisions():
                 running = False
 
+        # Update total length for average calculation
+        total_length += snake_length
+
         # Check if this game achieved a new maximum length
         if snake_length > max_length:
             max_length = snake_length
             best_game_states = game_states
 
-        # print(f"Game {game + 1}/{num_games} completed. Final Length: {snake_length}")
-
+    avg_length = total_length / num_games
+    print(f"All {num_games} games averaged a length of {avg_length:.2f}.")
     print(f"Best game achieved a length of {max_length}. Replaying it now...")
 
     # Replay the best game
@@ -476,6 +512,22 @@ def replay_game(game_states):
         clock.tick(FPS)  # Control the replay speed
 
     print("Replay completed!")
+    # Show final frame with a simple overlay and wait for user
+    overlay_bg = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+    overlay_bg.fill((0, 0, 0, 120))
+    screen.blit(overlay_bg, (0, 0))
+    font_big = pygame.font.Font(None, 48)
+    font_small = pygame.font.Font(None, 28)
+    elapsed_sec = max(0, (pygame.time.get_ticks() - game_start_ticks) / 1000.0)
+    text1 = font_big.render("Replay Over", True, (255, 255, 255))
+    text2 = font_small.render(f"Final Length: {snake_length}, Final Direction: {snake_dir}   Time: {elapsed_sec:.1f}s", True, (255, 255, 255))
+    text3 = font_small.render("Press any key or click to exit", True, (200, 200, 200))
+    screen.blit(text1, (SCREEN_WIDTH // 2 - text1.get_width() // 2, SCREEN_HEIGHT // 2 - 60))
+    screen.blit(text2, (SCREEN_WIDTH // 2 - text2.get_width() // 2, SCREEN_HEIGHT // 2 - 20))
+    screen.blit(text3, (SCREEN_WIDTH // 2 - text3.get_width() // 2, SCREEN_HEIGHT // 2 + 20))
+    pygame.display.flip()
+    wait_for_close()
+    return  # do not auto-quit; return to caller
 
 
 def train(num_episodes, epsilon, alpha, gamma, q_table):
@@ -491,9 +543,6 @@ def train(num_episodes, epsilon, alpha, gamma, q_table):
         green_apples = [(random.randint(0, GRID_SIZE - 1), random.randint(0, GRID_SIZE - 1)) for _ in range(2)]
         red_apple = (random.randint(0, GRID_SIZE - 1), random.randint(0, GRID_SIZE - 1))
 
-        # if (episode + 1) % 50000 == 0:
-        #     epsilon = 0.1
-        #     print(f"Resetting epsilon to {epsilon} at episode {episode + 1}")
         epsilon = max(0.01, epsilon * 0.99995)  # Decay epsilon but keep it above 0.01
 
         # Track cumulative reward for this episode
