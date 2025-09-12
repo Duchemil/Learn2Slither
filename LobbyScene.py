@@ -1,13 +1,16 @@
 import pygame
-import os
-from config import SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_SIZE, GRID_SIZE, CELL_SIZE, SNAKE_COLOR, SNAKE_EYE_COLOR
-from snake_game import play, train
+from config import (
+    SCREEN_WIDTH, SCREEN_HEIGHT, SCREEN_SIZE, GRID_SIZE,
+    CELL_SIZE, SNAKE_COLOR, SNAKE_EYE_COLOR
+)
+from snake_game import play, play_multiple_games
 import itertools
 
 BTN_COLOR = (60, 120, 220)
 BTN_HOVER = (80, 140, 240)
 TEXT = (240, 240, 240)
 TITLE = (255, 255, 255)
+
 
 class Button:
     def __init__(self, rect, text, onclick):
@@ -29,6 +32,7 @@ class Button:
         elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if self.rect.collidepoint(event.pos):
                 self.onclick()
+
 
 class LobbyScene:
     def __init__(self, q_table, defaults=None):
@@ -55,7 +59,7 @@ class LobbyScene:
         gap = 20
         labels = [
             ("Play", self.on_play),
-            ("Train", self.on_train),
+            ("Play Max", self.on_play_multiple),
             ("Toggle Verbose", self.on_toggle_verbose),
             ("Quit", self.on_quit),
         ]
@@ -72,14 +76,20 @@ class LobbyScene:
 
     def on_play(self):
         self.status = "Starting game..."
-        # Call existing play loop; returns after the game over screen is dismissed
         play(self.q_table, verbose=self.cfg["verbose"])
         self.status = "Returned from game."
 
-    def on_train(self):
-        self.status = f"Training {self.cfg['episodes']} episodes..."
-        train(self.cfg["episodes"], self.cfg["epsilon"], self.cfg["alpha"], self.cfg["gamma"], self.q_table)
-        self.status = "Training done. See Results."
+    def on_play_multiple(self):
+        try:
+            nb_games = int(input("Enter the number of games to play: "))
+            if nb_games <= 0:
+                raise ValueError("Number of games must be positive.")
+            self.status = f"Playing {nb_games} games..."
+            play_multiple_games(self.q_table, verbose=self.cfg["verbose"],
+                                num_games=nb_games)
+            self.status = f"Finished playing {nb_games} games."
+        except ValueError as e:
+            self.status = f"Invalid input: {e}"
 
     def on_quit(self):
         pygame.event.post(pygame.event.Event(pygame.QUIT))
@@ -99,7 +109,10 @@ class LobbyScene:
         for x in range(0, SCREEN_SIZE, CELL_SIZE):
             for y in range(0, SCREEN_SIZE, CELL_SIZE):
                 rect = pygame.Rect(x, y, CELL_SIZE, CELL_SIZE)
-                color = (100, 149, 237) if (x // CELL_SIZE + y // CELL_SIZE) % 2 == 0 else (70, 130, 180)
+                if (x // CELL_SIZE + y // CELL_SIZE) % 2 == 0:
+                    color = (100, 149, 237)
+                else:
+                    color = (70, 130, 180)
                 pygame.draw.rect(screen, color, rect)
         # Draw “snake” forming "42"
         snake_cells = _make_42_coords()
@@ -107,18 +120,26 @@ class LobbyScene:
             # Head = first cell
             head_x, head_y = snake_cells[0]
             for cx, cy in snake_cells:
-                rect = pygame.Rect(cx * CELL_SIZE, cy * CELL_SIZE, CELL_SIZE, CELL_SIZE)
+                rect = pygame.Rect(cx * CELL_SIZE, cy * CELL_SIZE,
+                                   CELL_SIZE, CELL_SIZE)
                 pygame.draw.rect(screen, SNAKE_COLOR, rect, border_radius=4)
             # Draw simple eyes on head
             head_px = head_x * CELL_SIZE
             head_py = head_y * CELL_SIZE
             eye_r = CELL_SIZE // 8
             eye_off = CELL_SIZE // 4
-            pygame.draw.circle(screen, SNAKE_EYE_COLOR, (head_px + eye_off, head_py + eye_off), eye_r)
-            pygame.draw.circle(screen, SNAKE_EYE_COLOR, (head_px + CELL_SIZE - eye_off, head_py + eye_off), eye_r)
+            pygame.draw.circle(screen, SNAKE_EYE_COLOR, (head_px + eye_off,
+                                                         head_py + eye_off),
+                               eye_r)
+            pygame.draw.circle(screen, SNAKE_EYE_COLOR,
+                               (head_px + CELL_SIZE - eye_off,
+                                head_py + eye_off), eye_r)
 
         title_text = "Learn2Slither"
-        neon_colors = itertools.cycle([(255, 0, 0), (255, 127, 0), (255, 255, 0), (0, 255, 0), (0, 255, 255), (0, 0, 255), (139, 0, 255)])
+        neon_colors = itertools.cycle([(255, 0, 0), (255, 127, 0),
+                                       (255, 255, 0), (0, 255, 0),
+                                       (0, 255, 255), (0, 0, 255),
+                                       (139, 0, 255)])
         x_offset = 20
 
         for char in title_text:
@@ -131,6 +152,7 @@ class LobbyScene:
         # Right panel and buttons
         for b in self.buttons:
             b.draw(screen, self.font)
+
 
 def _digit_glyph(d):
     # 3x5 monospace glyphs
@@ -151,6 +173,7 @@ def _digit_glyph(d):
             "###",
         ]
     raise ValueError("Unsupported digit")
+
 
 def _make_42_coords():
     # Build grid coords for "42" within GRID_SIZE, scaled and centered
@@ -175,7 +198,8 @@ def _make_42_coords():
             if ch == '#':
                 for yy in range(s):
                     for xx in range(s):
-                        coords.append((off_x + gx * s + xx, off_y + gy * s + yy))
+                        coords.append((off_x + gx * s + xx,
+                                       off_y + gy * s + yy))
     # Place '2'
     g2 = _digit_glyph('2')
     dx2 = (glyph_w + space_w) * s
@@ -184,5 +208,6 @@ def _make_42_coords():
             if ch == '#':
                 for yy in range(s):
                     for xx in range(s):
-                        coords.append((off_x + dx2 + gx * s + xx, off_y + gy * s + yy))
+                        coords.append((off_x + dx2 + gx * s + xx,
+                                       off_y + gy * s + yy))
     return coords

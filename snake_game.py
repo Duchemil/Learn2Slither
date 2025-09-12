@@ -8,7 +8,6 @@ from q_algorithm import (
 import pygame
 import random
 import sys
-import pickle
 import matplotlib.pyplot as plt
 from config import (
     GRID_SIZE,
@@ -127,7 +126,7 @@ def draw_snake():
 
 # Function to draw apples
 def draw_apples():
-    global red_apple, green_apples
+    global red_apple
 
     G_S = GRID_SIZE
 
@@ -180,7 +179,7 @@ def draw_apples():
 
 # Function to move the snake
 def move_snake():
-    global snake, snake_length
+    global snake
     new_head = (snake[0][0] + snake_dir[0], snake[0][1] + snake_dir[1])
     snake = [new_head] + snake[:snake_length - 1]
     # print(f"Snake moved to {new_head} in direction {snake_dir}")
@@ -188,7 +187,7 @@ def move_snake():
 
 # Function to check collisions
 def check_collisions():
-    global snake_length, green_apples, red_apple
+    global snake_length, red_apple
 
     # Helper function to get all empty spaces
     def get_empty_spaces():
@@ -325,29 +324,6 @@ def draw_right_section():
                      (SCREEN_SIZE, 0), (SCREEN_SIZE, SCREEN_HEIGHT), 2)
 
 
-def save_q_table(filename="q_table.pkl"):
-    with open(filename, "wb") as f:
-        pickle.dump(q_table, f)
-    print(f"Q-table saved to {filename}.")
-
-
-def load_q_table(filename="q_table.pkl"):
-    global q_table
-    try:
-        with open(filename, "rb") as f:
-            loaded_q_table = pickle.load(f)
-
-        # Merge the loaded Q-table with the existing one
-        q_table.update(loaded_q_table)
-
-        if len(q_table) > 0:
-            print("Sample Q-table entries:")
-            for key, value in list(q_table.items())[-5:]:
-                print(f"State-Action: {key}, Q-value: {value}")
-    except FileNotFoundError:
-        print(f"No Q-table found at {filename}. Starting with empty Q-table.")
-
-
 def build_ascii_board():
     board = [['.' for _ in range(GRID_SIZE)] for _ in range(GRID_SIZE)]
     vision = get_vision_cells()
@@ -467,7 +443,7 @@ def play(q_table, verbose=False):
 
 
 def play_multiple_games(q_table, verbose=False, num_games=1000):
-    global snake, snake_dir, snake_length, green_apples, red_apple, screen
+    global snake, snake_dir, snake_length, green_apples, red_apple
 
     max_length = 0
     total_length = 0
@@ -564,8 +540,7 @@ def replay_game(game_states):
     elapsed_sec = max(0, (pygame.time.get_ticks() - game_start_ticks) / 1000.0)
     text1 = font_big.render("Replay Over", True, (255, 255, 255))
     text2 = font_small.render(f"Final Length: {snake_length}, Final Direction:\
-                              {snake_dir}   Time: {elapsed_sec:.1f}s", True,
-                              (255, 255, 255))
+    {snake_dir}   Time: {elapsed_sec:.1f}s", True, (255, 255, 255))
     text3 = font_small.render("Press any key or click to exit", True,
                               (200, 200, 200))
     screen.blit(text1, (SCREEN_WIDTH // 2 - text1.get_width() // 2,

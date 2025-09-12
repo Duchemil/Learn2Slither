@@ -1,6 +1,6 @@
 import random
-from collections import Counter
 from config import GRID_SIZE
+
 
 def choose_action(state, epsilon, current_dir, q_table):
     directions = {
@@ -12,7 +12,8 @@ def choose_action(state, epsilon, current_dir, q_table):
 
     valid_actions = [
         action for action, direction in directions.items()
-        if not (direction[0] == -current_dir[0] and direction[1] == -current_dir[1])
+        if not (direction[0] == -current_dir[0]
+                and direction[1] == -current_dir[1])
     ]
 
     if random.uniform(0, 1) < epsilon:
@@ -22,7 +23,8 @@ def choose_action(state, epsilon, current_dir, q_table):
         q_values = {a: q_table.get((state, a), 0) for a in valid_actions}
         # print(f"Valid actions: {valid_actions}")
         # print(f"Q-values for valid actions: {q_values}")
-        return max(q_values, key=q_values.get, default=random.choice(valid_actions))
+        return max(q_values, key=q_values.get,
+                   default=random.choice(valid_actions))
 
 
 def update_q_value(state, action, reward, next_state, alpha, gamma, q_table):
@@ -31,16 +33,18 @@ def update_q_value(state, action, reward, next_state, alpha, gamma, q_table):
     next_state = tuple(next_state)
 
     # Get the maximum Q-value for the next state
-    max_next_q = max([q_table.get((next_state, a), 0) for a in range(4)], default=0)
+    max_next_q = max([q_table.get((next_state, a), 0) for a in range(4)],
+                     default=0)
 
     # Update the Q-value for the current state-action pair
     current_q = q_table.get((state, action), 0)
     new_q = current_q + alpha * (reward + gamma * max_next_q - current_q)
     q_table[(state, action)] = new_q
 
- 
+
 def normalize(value, grid_size):
     return round(value / grid_size, 2)
+
 
 def get_state(snake, green_apples, red_apple):
     head_x, head_y = snake[0]
@@ -99,13 +103,17 @@ def calculate_reward(snake, green_apples, red_apple, GRID_SIZE):
     # Reward for eating green apple
     if head in green_apples:
         return 10
-    
+
     # Penalty for eating red apple
     if head == red_apple:
         return -10
 
     # Penalty for hitting wall or itself
-    if head[0] < 0 or head[0] >= GRID_SIZE or head[1] < 0 or head[1] >= GRID_SIZE or head in snake[1:]:
+    if (
+        head[0] < 0 or head[0] >= GRID_SIZE or
+        head[1] < 0 or head[1] >= GRID_SIZE or
+        head in snake[1:]
+    ):
         return -100
 
     # If the snake has only one segment, skip distance-based rewards/penalties
@@ -115,17 +123,15 @@ def calculate_reward(snake, green_apples, red_apple, GRID_SIZE):
     prev_head = snake[1]  # The previous head position
 
     # Reward for moving closer to a green apple
-    closest_green_apple = min(green_apples, key=lambda apple: abs(apple[0] - head[0]) + abs(apple[1] - head[1]))
-    prev_distance_to_green = abs(closest_green_apple[0] - prev_head[0]) + abs(closest_green_apple[1] - prev_head[1])
-    new_distance_to_green = abs(closest_green_apple[0] - head[0]) + abs(closest_green_apple[1] - head[1])
+    closest_green_apple = min(green_apples,
+                              key=lambda apple: abs(apple[0] - head[0])
+                              + abs(apple[1] - head[1]))
+    prev_distance_to_green = abs(closest_green_apple[0] - prev_head[0])
+    + abs(closest_green_apple[1] - prev_head[1])
+    new_distance_to_green = abs(closest_green_apple[0] - head[0])
+    + abs(closest_green_apple[1] - head[1])
     if new_distance_to_green < prev_distance_to_green:
         return 1  # Small reward for moving closer
-
-    # Penalty for moving closer to a red apple
-    # prev_distance_to_red = abs(red_apple[0] - prev_head[0]) + abs(red_apple[1] - prev_head[1])
-    # new_distance_to_red = abs(red_apple[0] - head[0]) + abs(red_apple[1] - head[1])
-    # if new_distance_to_red < prev_distance_to_red:
-    #     return -1  # Small penalty for moving closer to a red apple
 
     # Small penalty for each move to encourage shorter paths
     return -1
